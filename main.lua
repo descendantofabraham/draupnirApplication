@@ -81,11 +81,13 @@ type PUBLIC_Tick = number
 type PUBLIC_Model = Model
 type PUBLIC_Weld = WeldConstraint
 
+-- Fancy type-checking stuff for the "DraupnirModule" class
 export type Debug = {
 	__lastTick: PUBLIC_Tick,
 	__enabled: PUBLIC_Debugging
 }
 
+-- More fancy type-checking stuff but for the "DraupnirModule" class
 export type DraupnirModule = {
 	New: {{model: PUBLIC_Model, weld : PUBLIC_Weld, busy: PUBLIC_Busy}},
 	Clock: PUBLIC_Tick,
@@ -105,6 +107,7 @@ end
 function DraupnirModule:DeclareConstants()
 	local Constants = Dependencies.__array.ParameterDenoteModule:ReturnConstants()
 	
+	-- Gets all the constants from the constants module and puts them into the Dependencies class.
 	for name,value in next, Constants do
 		if not Dependencies[name] then
 			Dependencies[name] = value
@@ -120,6 +123,7 @@ function DraupnirModule:Clock()
 	local clockedTime = {}
 	clockedTime[1] = tick() - Debug.__lastTick
 	
+	-- Debug check
 	if Debug.__enabled then
 		warn("Module loaded in", tostring(clockedTime[1]), "seconds.")
 	end
@@ -129,6 +133,7 @@ end
 
 -- Explodes the last projectile that was successfully shot into a target.
 function DraupnirModule:Explode(Character : PRIVATE_Character, ConfigurationTable : PRIVATE_Configuration, localizedName : PRIVATE_FullName)
+	-- Assertions for type-checking and null instances.
 	assert(Character, "Character was not provided.")
 	assert(ConfigurationTable, "ConfigurationTable was not provided.")
 	assert(localizedName, "localizedName was not provided.")
@@ -136,27 +141,32 @@ function DraupnirModule:Explode(Character : PRIVATE_Character, ConfigurationTabl
 	assert(typeof(ConfigurationTable) == "table", "ConfigurationTable cannot be utilized.")
 	assert(typeof(localizedName) == "string", "localizedName cannot be utilized.")
 	
+	-- Halts the code progression if the method is current busy. Weird way of checking if it's true, I know. Purely stylistic.
 	if not tostring(Dependencies.__array.Values.busy):match("false") then 
 		return 
 	end
-
+	
+	-- Keep this here. Trying to call this method with no active spears will make the module get really mad.
 	if #self.ActiveSpears <= 0 then 
 		return 
 	end
-
+	
+	-- Setting variables and creating constructors
 	local IsolatedTable = {}
-	local Index = self.ActiveSpears[#self.ActiveSpears]
-	local IsolatedIndex = table.remove(self.ActiveSpears, table.find(self.ActiveSpears,Index))
+	local Index = self.ActiveSpears[#self.ActiveSpears] 
+	local IsolatedIndex = table.remove(self.ActiveSpears, table.find(self.ActiveSpears,Index)) -- For the whole exploding the latest dart thing, there was another reason behind this that I forgot though
 	local NewParticle = Dependencies.__array.VisualParticleModule.New()
 	local Pos = Index.model.Position
 	local Weld = Index.weld		
 	table.insert(IsolatedTable, IsolatedIndex)
-
+	
+	-- Setting up particles and redefining variables
 	NewParticle:Setup()
 	NewParticle.Attachment.WorldCFrame = IsolatedIndex.model.CFrame
 	Pos = IsolatedIndex.model.Position
 	Weld = IsolatedIndex.weld
-
+	
+	-- Creates a new coroutine for the actual explosion part of all of this.
 	coroutine.wrap(function()
 		local Particle = Index.model.Charge
 		local NewSound = Dependencies.__array.SoundControllersModule.NewSound()
@@ -165,42 +175,49 @@ function DraupnirModule:Explode(Character : PRIVATE_Character, ConfigurationTabl
 		local NewImpactFrame = Dependencies.__array.ImpactFrameModule.New()	
 		Particle:Emit(Dependencies.StickEmitCount)
 		NewSound:Setup()
-
+		
+		-- Adding all the sounds to the NewSound controller
 		NewSound:AddSound("Pulse", SoundsFolder.Pulse:Clone())
 		NewSound:AddSound("Swoosh", SoundsFolder.Charge:Clone())
 		NewSound:AddSound("ExplosionA", SoundsFolder.Explosion:Clone())
 		NewSound:AddSound("ExplosionB", SoundsFolder.Explosion2:Clone())
 		NewSound:AddSound("ExplosionB", SoundsFolder.Explosion2:Clone())
-
+		
+		-- Setting the position of the attachment so the sound actually comes from the dart.
 		NewSound.Attachment.WorldCFrame = CFrame.new(Pos)
 		NewSound:PlaySound("Swoosh",.93,1.12)
 		NewSound:PlaySound("Pulse",3.2,3.7)
-
+		
+		-- Finds the humanoid (if there is one) and damages it.
 		if Weld.Part1.Parent:FindFirstChildWhichIsA("Humanoid") then
 			local Humanoid = Weld.Part1.Parent:FindFirstChildWhichIsA("Humanoid")
 			Humanoid:TakeDamage(math.ceil(ConfigurationTable["%^dm.Impulse"] / Dependencies.ImpulseDivision))
 		end
 
+		-- Just to sync up the sounds with the actual explosion, makes it feel alive.	
 		task.delay(.35,function()
-			NewSound:PlaySound("ExplosionA",1,1.19)
+			NewSound:PlaySound("ExplosionA",1,1.19) -- Playing the explosion sounds we made earlier through the NewSound controller.
 			NewSound:PlaySound("ExplosionB",1.19,1.33)
 			NewParticle:CopyFolder(ParticlesFolder, Dependencies.DefaultEmitCount)
-			NewImpactFrame:StartImpactFrame("%0a+00", Dependencies.ImpactFrameLifespan)
-
+			NewImpactFrame:StartImpactFrame("%0a+00", Dependencies.ImpactFrameLifespan) -- Fancy impact frame string name, it's ugly but I love it.
+			
+			-- Finds the humanoid (if there is one) and damages it, then creates some blood from the BloodModule.
 			if Weld.Part1.Parent:FindFirstChildWhichIsA("Humanoid") then
 				local Humanoid = Weld.Part1.Parent:FindFirstChildWhichIsA("Humanoid")
 				task.spawn(function()
 					Dependencies.__array.BloodModule.BloodEmissionService(Pos, Character, Instance.new("Attachment"), 3, 1, 2, 0, 8, .25, 1500)
 				end)
-				Humanoid:TakeDamage(ConfigurationTable["%^dm.Impulse"])
+				Humanoid:TakeDamage(ConfigurationTable["%^dm.Impulse"]) -- Another fancy name for the ConfigTable variables.
 			end
-
+			
+			-- Gets rid of all the other ParticleEmitters.
 			for _,v in next, IsolatedIndex.model:GetDescendants() do
 				if v:IsA("ParticleEmitter") then
 					v:Destroy()
 				end
 			end
-
+			
+			-- Gets rid of the "dart" itself, we don't like memory leaks.
 			IsolatedIndex.model:Destroy()
 			IsolatedIndex = nil
 			table.clear(IsolatedTable)
@@ -210,54 +227,67 @@ end
 
 -- Shoots a projectile.
 function DraupnirModule:Throw(Character, UserCFrame, Length, SpearTemplate:Model, Switch:boolean, ConfigurationTable:{})
+	-- I don't actually know if having the non-tostring version is necessary, but just incase it gives slightly better performance.
 	local unlocalizedName = SpearTemplate.Parent.Parent.Name
-	local localizedName = tostring(unlocalizedName)
+	local localizedName = tostring(unlocalizedName) 
 	
+	-- Determines if we're "throwing" or "exploding".
 	if not Switch then
+		-- Setting some variabes here and shooting our Ray
 		local BeamsFolder = ReplicatedStorage.Beams
 		local TranslatedDirection = (UserCFrame.Position - Character.PrimaryPart.Position).Unit
 		local CharacterPosition = Character.PrimaryPart.Position
 		local RetranslatedRay = Dependencies.__array.RayConstructionModule:ShootRay(CharacterPosition, TranslatedDirection, Length, UserCFrame, Dependencies.DefaultParameters)
 		local SpearTemplate : BasePart = SpearTemplate.MainAsset:Clone()
+		
+		-- Cool VFX stuff
 		local ThrownBeam = BeamsFolder.Beam:Clone()
 		local GlitchedPillar = BeamsFolder.Pillar:Clone()
 		local StartingAttachment = Instance.new('Attachment')
 		local EndAttachment = Instance.new('Attachment')
-
+		
+		-- Need to make sure we actually have a target to stick our "dart" into.
 		if RetranslatedRay then
 			if RetranslatedRay.Instance.Parent:FindFirstChildWhichIsA("Humanoid") and RetranslatedRay.Instance.Parent:FindFirstChildWhichIsA("Humanoid").Health <= 0 then return end
+			
+			-- More sound controllers and impact frames, just for shooting our dart this time.
 			local NewSound = Dependencies.__array.SoundControllersModule.NewSound()	
 			local NewImpactFrame = Dependencies.__array.ImpactFrameModule.New()	
 			local NewBeamTween = TweenService:Create(ThrownBeam, Dependencies.DefaultTweenInfo, {Width1 = 0})
 			local NewPillarTween = TweenService:Create(GlitchedPillar, Dependencies.FastTweenInfo, {Transparency = 1})
 			
+			-- Ray math stuff
 			local RayOffset = Dependencies.__array.Constants.rayoffset
 			local UntranslatedRayCFrame = CFrame.new(RetranslatedRay.Position,RetranslatedRay.Position-RetranslatedRay.Normal)
 			local TranslatedRayCFrame = UntranslatedRayCFrame * RayOffset
 			local DedicatedWeld = Instance.new("WeldConstraint")
 			local Dictionary = {}
 			
+			-- Gets our sounds and impact frames going
 			NewSound:Setup()
 			NewImpactFrame:StartImpactFrame("%0a+01", Dependencies.ImpactFrameLifespan)
 			NewSound.Attachment.WorldCFrame = UserCFrame
 			
+			-- Parents our VFX stuff to their corresponding spots, and positions thems
 			GlitchedPillar.Parent = workspace.Debris
 			StartingAttachment.Parent = workspace.Terrain
 			EndAttachment.Parent = workspace.Terrain
 			StartingAttachment.WorldPosition = CharacterPosition
 			EndAttachment.WorldPosition = TranslatedRayCFrame.Position
 			GlitchedPillar.Position = TranslatedRayCFrame.Position
-			ThrownBeam.Parent = StartingAttachment
+			ThrownBeam.Parent = StartingAttachment -- These are for the "trails", it doesn't use actual projectiles so I used beams instead of actual trails!
 			ThrownBeam.Attachment0 = StartingAttachment
 			ThrownBeam.Attachment1 = EndAttachment
 			
+			-- Adds a couple more sounds and plays them right after.
 			NewSound:AddSound("HitA", Dependencies.__array.Folders.Sounds[localizedName].Hit:Clone())
 			NewSound:AddSound("HitB", Dependencies.__array.Folders.Sounds[localizedName].Hit2:Clone())
 			NewSound:PlaySound("HitA",1.91,2.13)
 			NewSound:PlaySound("HitB",.85,.97)
 			NewBeamTween:Play()
 			NewPillarTween:Play()
-
+			
+			-- Sticks and welds our "dart" into whatever it hit, at the right angle (thank you raycasting)
 			SpearTemplate.Parent = workspace.Debris.Spears
 			SpearTemplate.Anchored = false
 			SpearTemplate.CFrame = TranslatedRayCFrame
@@ -271,12 +301,14 @@ function DraupnirModule:Throw(Character, UserCFrame, Length, SpearTemplate:Model
 			}
 			table.insert(self.ActiveSpears, Dictionary)
 			
+			-- Damages the humanoid slightly (if it finds it), and makes a bit of blood come out
 			if RetranslatedRay.Instance and RetranslatedRay.Instance.Parent:FindFirstChildWhichIsA("Humanoid") then
 				local Humanoid = RetranslatedRay.Instance.Parent:FindFirstChildWhichIsA("Humanoid")
 				Dependencies.__array.BloodModule.BloodEmissionService(RetranslatedRay.Position, Character, Instance.new("Attachment"), 1, .3, .4, .2, 4, .1, 500)
 				Humanoid:TakeDamage(ConfigurationTable["%^dm.Inject"])
 			end
 			
+			-- We don't like memory leaks!!!
 			Debris:AddItem(ThrownBeam, 2)
 			Debris:AddItem(StartingAttachment, 2)
 			Debris:AddItem(EndAttachment, 2)
@@ -284,8 +316,10 @@ function DraupnirModule:Throw(Character, UserCFrame, Length, SpearTemplate:Model
 		end
 	end
 	
+	-- Checks if we're actually "exploding" the dart this time.
 	if Switch then
-		self:Explode(Character, ConfigurationTable, localizedName)
+		-- If we are, we call the Explode method.
+		self:Explode(Character, ConfigurationTable, localizedName) 
 	end
 end
 
