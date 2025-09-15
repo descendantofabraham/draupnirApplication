@@ -11,8 +11,8 @@ d88" `888  d88" `88b d88(  "8 d88" `"Y8 d88" `88b `888P"Y88b  d88" `888  `P  )88
 -- Copyright, 2025, descendantdescendantdescendant
 -- Preload Globals
 local Debug = {}
-Debug.__enabled = false
-Debug.__lastTick = tick()
+Debug.__enabled = false -- false = no debug outputs
+Debug.__lastTick = tick() -- for the Clock method
 
 -- Services
 local Players = game:GetService("Players")
