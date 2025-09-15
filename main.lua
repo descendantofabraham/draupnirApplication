@@ -8,7 +8,7 @@ d88" `888  d88" `88b d88(  "8 d88" `"Y8 d88" `88b `888P"Y88b  d88" `888  `P  )88
 888   888  888    .o o.  )88b 888   .o8 888    .o  888   888  888   888  d8(  888   888   888    888 .
 `Y8bod88P" `Y8bod8P" 8""888P" `Y8bod8P" `Y8bod8P" o888o o888o `Y8bod88P" `Y888""8o o888o o888o   "888"                                                                                             
 ]]
--- Copyright, 2025, descendantdescendantdescendant
+-- Copyright, 2025, descendantdescendantdescendant / string.match
 -- Preload Globals
 local Debug = {}
 Debug.__enabled = false -- false = no debug outputs
